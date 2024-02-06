@@ -6,6 +6,7 @@ import pandas as pd
 from stable_baselines3.common.env_checker import check_env
 from copy import deepcopy
 from random import randint
+from math import log2, ceil
 
 
 
@@ -253,24 +254,39 @@ class SliceCreationEnv3(gym.Env):
         # Logic to check if there are available resources to allocate the VNF request
         # Return True if resources are available, False otherwise
 
+        #Check RAn Resources ----------------------------------------------------------------------------------------------------------------------------
+        ran_resources = self.check_RAN(request)
+
+
+        # Check MEC resources----------------------------------------------------------------------------------------------------------------------------
         slice_id = self.create_slice(request)
 
         if slice_id == 1:
-            if self.resources_1['MEC_CPU'] >= request['SLICE_MEC_CPU_REQUEST'] and self.resources_1['MEC_RAM'] >= request['SLICE_MEC_RAM_REQUEST'] and self.resources_1['MEC_STORAGE'] >= request['SLICE_MEC_STORAGE_REQUEST'] and self.resources_1['MEC_BW'] >= request['SLICE_MEC_BW_REQUEST']:
+            if (self.resources_1['MEC_CPU'] >= request['SLICE_MEC_CPU_REQUEST'] and self.resources_1['MEC_RAM'] >= request['SLICE_MEC_RAM_REQUEST'] and 
+                self.resources_1['MEC_STORAGE'] >= request['SLICE_MEC_STORAGE_REQUEST'] and self.resources_1['MEC_BW'] >= request['SLICE_MEC_BW_REQUEST'] and ran_resources
+                ):
                 self.resources_flag = 1
             else: self.resources_flag = 0
         elif slice_id == 2:
-            if self.resources_2['MEC_CPU'] >= request['SLICE_MEC_CPU_REQUEST'] and self.resources_2['MEC_RAM'] >= request['SLICE_MEC_RAM_REQUEST'] and self.resources_2['MEC_STORAGE'] >= request['SLICE_MEC_STORAGE_REQUEST'] and self.resources_2['MEC_BW'] >= request['SLICE_MEC_BW_REQUEST']:
+            if (self.resources_2['MEC_CPU'] >= request['SLICE_MEC_CPU_REQUEST'] and self.resources_2['MEC_RAM'] >= request['SLICE_MEC_RAM_REQUEST'] and 
+                self.resources_2['MEC_STORAGE'] >= request['SLICE_MEC_STORAGE_REQUEST'] and self.resources_2['MEC_BW'] >= request['SLICE_MEC_BW_REQUEST'] and ran_resources
+                ):
                 self.resources_flag = 1
             else: self.resources_flag = 0
         elif slice_id == 3:
-            if self.resources_3['MEC_CPU'] >= request['SLICE_MEC_CPU_REQUEST'] and self.resources_3['MEC_RAM'] >= request['SLICE_MEC_RAM_REQUEST'] and self.resources_3['MEC_STORAGE'] >= request['SLICE_MEC_STORAGE_REQUEST'] and self.resources_3['MEC_BW'] >= request['SLICE_MEC_BW_REQUEST']:
+            if (self.resources_3['MEC_CPU'] >= request['SLICE_MEC_CPU_REQUEST'] and self.resources_3['MEC_RAM'] >= request['SLICE_MEC_RAM_REQUEST'] and 
+                self.resources_3['MEC_STORAGE'] >= request['SLICE_MEC_STORAGE_REQUEST'] and self.resources_3['MEC_BW'] >= request['SLICE_MEC_BW_REQUEST'] and ran_resources
+                ):
                 self.resources_flag = 1
             else: self.resources_flag = 0
     
     def allocate_slice(self, request, slice_id):
         # Allocate the resources requested by the current VNF
 
+        # RAN resources part---------------------------------------------------------------
+        self.allocate_ran(request)
+        
+        # MEC resources part---------------------------------------------------------------
         if slice_id == 1:
             self.resources_1['MEC_CPU'] -= request['SLICE_MEC_CPU_REQUEST']
             self.resources_1['MEC_RAM'] -= request['SLICE_MEC_RAM_REQUEST']
@@ -290,13 +306,14 @@ class SliceCreationEnv3(gym.Env):
     def deallocate_slice(self, request, slice_id):
         # Function to deallocate resources of killed requests
 
+        # RAN Resources Part-----------------------------------------------------------
         indices = np.where(self.PRB_map == request['UE_ID'])
 
         for i in range(len(indices[0])):
             #print(f"({indices[0][i]}, {indices[1][i]})")
             self.PRB_map[indices[0][i], indices[1][i]] = 0
 
-
+        # MEC Resources Part------------------------------------------------------------
         if slice_id == 1:
             self.resources_1['MEC_CPU'] += request['SLICE_MEC_CPU_REQUEST']
             self.resources_1['MEC_RAM'] += request['SLICE_MEC_RAM_REQUEST']
@@ -419,6 +436,25 @@ class SliceCreationEnv3(gym.Env):
                 self.reward = 0        
         
         return terminated
+
+    def check_RAN(self, request):
+        indices = np.where(self.PRB_map == 0)
+        available_symbols = len(indices[0])
+
+        W_total = self.PRB_BW * self.sprectral_efficiency * available_symbols
+
+        if request['SLICE_RAN_R_REQUEST'] * (10^6) <= W_total * log2(1 + request['UE_SiNR']):
+            return True
+        else: return False
+
+    def allocate_ran(self, request):
+        indices = np.where(self.PRB_map == 0)
+
+        number_symbols = ceil((request['SLICE_RAN_R_REQUEST'] * (10^6)) / (self.PRB_BW * self.sprectral_efficiency * log2(1 + request['UE_SiNR'])))
+
+        for i in range(len(number_symbols)):
+            #print(f"({indices[0][i]}, {indices[1][i]})")
+            self.PRB_map[indices[0][i], indices[1][i]] = request['UE_ID']
 
     def render(self):
         if self.render_mode == "rgb_array":
