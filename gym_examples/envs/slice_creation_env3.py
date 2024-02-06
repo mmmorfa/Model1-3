@@ -6,7 +6,7 @@ import pandas as pd
 from stable_baselines3.common.env_checker import check_env
 from copy import deepcopy
 from random import randint
-from math import log2, ceil
+from math import log2, ceil, floor
 
 
 
@@ -119,11 +119,11 @@ class SliceCreationEnv3(gym.Env):
         self.scs = 2^(self.numerology) * 15_000   # Hz
         self.slot_per_subframe = 2^(self.numerology)
         
-        self.channel_BW = 50_000_000              # Hz (100MHz for <6GHz band, and 400MHZ for mmWave)
+        self.channel_BW = 10_000_000              # Hz (100MHz for <6GHz band, and 400MHZ for mmWave)
         self.guard_BW = 845_000                   # Hz (for symmetric guard band)
 
-        self.PRB_BW = self.scs * 12               # Bandwidth for one PRB (one OFDM symbol, 12 subcarriers)
-        self.PRB_per_channel = (self.channel_BW - (2*self.guard_BW)) / (self.PRB_BW)        # Number of PRB to allocate within the channel bandwidth
+        self.PRB_BW = self.scs * 12               # Hz - Bandwidth for one PRB (one OFDM symbol, 12 subcarriers)
+        self.PRB_per_channel = floor((self.channel_BW - (2*self.guard_BW)) / (self.PRB_BW))        # Number of PRB to allocate within the channel bandwidth
         self.sprectral_efficiency = 5.1152        # bps/Hz (For 64-QAM and 873/1024)
 
         self.PRB_map = np.zeros((14, self.PRB_per_channel))                                 # PRB map per slot (14 OFDM symbols x Number of PRB to allocate within the channel bandwidth)
@@ -142,13 +142,14 @@ class SliceCreationEnv3(gym.Env):
         self.slice_requests = pd.read_csv('/home/mario/Documents/DQN_Models/Model 1/gym-examples3/gym_examples/slice_request_db3')  # Load VNF requests from the generated CSV
         #self.slice_requests = pd.read_csv('/data/scripts/DQN_models/Model1/gym_examples/slice_request_db1')    #For pod
         
-        self.observation_space = gym.spaces.Box(low=0, high=10000, shape=(5,), dtype=np.float32) #ovservation space composed by Requested resources (MEC BW) and available MEC resources.
+        # VECTORS----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+        self.observation_space = gym.spaces.Box(low=0, high=10000, shape=(6,), dtype=np.float32) #ovservation space composed by Requested resources (MEC BW) and available MEC resources.
         
         self.action_space = gym.spaces.Discrete(4)  # 0: Do Nothing, 1: Allocate Slice 1, 2: Allocate Slice 2, 3: Allocate Slice 3
 
         #self.process_requests()
         
-        # Define other necessary variables and data structures
+        # Other necessary variables and data structures
         self.current_time_step = 1
         self.reward = 0
         self.first = True
@@ -171,19 +172,20 @@ class SliceCreationEnv3(gym.Env):
         self.reward = 0
         self.processed_requests = []
         self.reset_resources()
-        self.slice_requests = pd.read_csv('/home/mario/Documents/DQN_Models/Model 1/gym-examples2/gym_examples/slice_request_db2')  # Load VNF requests from the generated CSV
+        self.slice_requests = pd.read_csv('/home/mario/Documents/DQN_Models/Model 1/gym-examples3/gym_examples/slice_request_db3')  # Load VNF requests from the generated CSV
         #self.slice_requests = pd.read_csv('/data/scripts/DQN_models/Model1/gym_examples/slice_request_db1')    #For pod
         self.next_request = self.read_request()
         #slice_id = self.create_slice(self.next_request)
         self.update_slice_requests(self.next_request)
         self.check_resources(self.next_request)
         self.observation = np.array([self.next_request['SLICE_MEC_CPU_REQUEST']] + [self.next_request['SLICE_MEC_RAM_REQUEST']] 
-                                    + [self.next_request['SLICE_MEC_STORAGE_REQUEST']] + [self.next_request['SLICE_MEC_BW_REQUEST']] + [self.resources_flag], dtype=np.float32)
+                                    + [self.next_request['SLICE_MEC_STORAGE_REQUEST']] + [self.next_request['SLICE_MEC_BW_REQUEST']] 
+                                    + [self.next_request['SLICE_RAN_R_REQUEST']]+ [self.resources_flag], dtype=np.float32)
         #self.observation = np.array([self.next_request[1]] + deepcopy(self.resources), dtype=np.float32)
         self.info = {}
         self.first = True
         
-        print("\nReset: ", self.observation)
+        #print("\nReset: ", self.observation)
         
         return self.observation, self.info
 
@@ -212,7 +214,8 @@ class SliceCreationEnv3(gym.Env):
     
         #self.observation = np.array([self.next_request[1]] + [self.resources_flag], dtype=np.float32)
         self.observation = np.array([self.next_request['SLICE_MEC_CPU_REQUEST']] + [self.next_request['SLICE_MEC_RAM_REQUEST']] 
-                                    + [self.next_request['SLICE_MEC_STORAGE_REQUEST']] + [self.next_request['SLICE_MEC_BW_REQUEST']] + [self.resources_flag], dtype=np.float32)
+                                    + [self.next_request['SLICE_MEC_STORAGE_REQUEST']] + [self.next_request['SLICE_MEC_BW_REQUEST']] 
+                                    + [self.next_request['SLICE_RAN_R_REQUEST']] + [self.resources_flag], dtype=np.float32)
         
         #done = False
         
@@ -244,7 +247,7 @@ class SliceCreationEnv3(gym.Env):
         if len(self.processed_requests) != 0:
             for i in self.processed_requests:
                 #i[2] < request[0]
-                if len(i)== 7 and i['SLICE_KILL_@TIME'] <= request['ARRIVAL_REQUEST_@TIME']:
+                if len(i)== 10 and i['SLICE_KILL_@TIME'] <= request['ARRIVAL_REQUEST_@TIME']:
                     slice_id = self.create_slice(i)
                     self.deallocate_slice(i, slice_id)
                     self.processed_requests.remove(i)
@@ -333,24 +336,24 @@ class SliceCreationEnv3(gym.Env):
     def create_slice (self, request):
         # Function to create the slice for a specific request
         # This function inserts the defined slice to the request in the processed requests list
-        # self.slices_param = {1: [2, 4, 20, 10], 2: [4, 8, 20, 20], 3: [8, 16, 100, 50]}
+        # self.slices_param = {1: [2, 4, 20, 10, 20], 2: [4, 8, 20, 20, 40], 3: [8, 16, 100, 50, 50]}
         slice1 = self.slices_param[1]
         slice2 = self.slices_param[2]
         slice3 = self.slices_param[3]
         
         if (request['SLICE_MEC_CPU_REQUEST'] <= slice1[0] and request['SLICE_MEC_RAM_REQUEST'] <= slice1[1] and 
             request['SLICE_MEC_STORAGE_REQUEST'] <= slice1[2] and request['SLICE_MEC_BW_REQUEST'] <= slice1[3] and
-            request['SLICE_RAN_R'] <= slice1[4]
+            request['SLICE_RAN_R_REQUEST'] <= slice1[4]
             ):
             slice_id = 1
         elif (request['SLICE_MEC_CPU_REQUEST'] <= slice2[0] and request['SLICE_MEC_RAM_REQUEST'] <= slice2[1] and 
               request['SLICE_MEC_STORAGE_REQUEST'] <= slice2[2] and request['SLICE_MEC_BW_REQUEST'] <= slice2[3] and 
-              request['SLICE_RAN_R'] <= slice2[4]
+              request['SLICE_RAN_R_REQUEST'] <= slice2[4]
               ):
             slice_id = 2
         elif (request['SLICE_MEC_CPU_REQUEST'] <= slice3[0] and request['SLICE_MEC_RAM_REQUEST'] <= slice3[1] and 
               request['SLICE_MEC_STORAGE_REQUEST'] <= slice3[2] and request['SLICE_MEC_BW_REQUEST'] <= slice3[3] and
-              request['SLICE_RAN_R'] <= slice3[4]
+              request['SLICE_RAN_R_REQUEST'] <= slice3[4]
               ):
             slice_id = 3
         return slice_id
@@ -452,7 +455,7 @@ class SliceCreationEnv3(gym.Env):
 
         number_symbols = ceil((request['SLICE_RAN_R_REQUEST'] * (10^6)) / (self.PRB_BW * self.sprectral_efficiency * log2(1 + request['UE_SiNR'])))
 
-        for i in range(len(number_symbols)):
+        for i in range(number_symbols):
             #print(f"({indices[0][i]}, {indices[1][i]})")
             self.PRB_map[indices[0][i], indices[1][i]] = request['UE_ID']
 
@@ -465,5 +468,5 @@ class SliceCreationEnv3(gym.Env):
             pygame.display.quit()
             pygame.quit()
             
-#a = SliceCreationEnv2()
-#check_env(a)
+a = SliceCreationEnv3()
+check_env(a)
