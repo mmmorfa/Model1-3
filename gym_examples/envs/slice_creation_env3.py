@@ -123,6 +123,7 @@ class SliceCreationEnv3(gym.Env):
 
         self.PRB_BW = self.scs * 12               # Bandwidth for one PRB (one OFDM symbol, 12 subcarriers)
         self.PRB_per_channel = (self.channel_BW - (2*self.guard_BW)) / (self.PRB_BW)        # Number of PRB to allocate within the channel bandwidth
+        self.sprectral_efficiency = 5.1152        # bps/Hz (For 64-QAM and 873/1024)
 
         self.PRB_map = np.zeros((14, self.PRB_per_channel))                                 # PRB map per slot (14 OFDM symbols x Number of PRB to allocate within the channel bandwidth)
 
@@ -133,11 +134,11 @@ class SliceCreationEnv3(gym.Env):
         self.resources_2 = {'MEC_CPU': 50, 'MEC_RAM': 256, 'MEC_STORAGE': 250, 'MEC_BW': 100}
         self.resources_3 = {'MEC_CPU': 50, 'MEC_RAM': 512, 'MEC_STORAGE': 500, 'MEC_BW': 500}
         
-        #Defined parameters per Slice. (Each component is a list of the correspondent slice parameters)
+        #Defined parameters per Slice. (Each component is a list of the correspondent slice parameters)-------------------------------------------------------------------------------------
         #self.slices_param = [10, 20, 50]
-        self.slices_param = {1: [2, 4, 20, 10], 2: [4, 8, 20, 20], 3: [8, 16, 100, 50]}
+        self.slices_param = {1: [2, 4, 20, 10, 20], 2: [4, 8, 20, 20, 40], 3: [8, 16, 100, 50, 50]}
 
-        self.slice_requests = pd.read_csv('/home/mario/Documents/DQN_Models/Model 1/gym-examples2/gym_examples/slice_request_db2')  # Load VNF requests from the generated CSV
+        self.slice_requests = pd.read_csv('/home/mario/Documents/DQN_Models/Model 1/gym-examples3/gym_examples/slice_request_db3')  # Load VNF requests from the generated CSV
         #self.slice_requests = pd.read_csv('/data/scripts/DQN_models/Model1/gym_examples/slice_request_db1')    #For pod
         
         self.observation_space = gym.spaces.Box(low=0, high=10000, shape=(5,), dtype=np.float32) #ovservation space composed by Requested resources (MEC BW) and available MEC resources.
@@ -172,7 +173,7 @@ class SliceCreationEnv3(gym.Env):
         self.slice_requests = pd.read_csv('/home/mario/Documents/DQN_Models/Model 1/gym-examples2/gym_examples/slice_request_db2')  # Load VNF requests from the generated CSV
         #self.slice_requests = pd.read_csv('/data/scripts/DQN_models/Model1/gym_examples/slice_request_db1')    #For pod
         self.next_request = self.read_request()
-        slice_id = self.create_slice(self.next_request)
+        #slice_id = self.create_slice(self.next_request)
         self.update_slice_requests(self.next_request)
         self.check_resources(self.next_request)
         self.observation = np.array([self.next_request['SLICE_MEC_CPU_REQUEST']] + [self.next_request['SLICE_MEC_RAM_REQUEST']] 
@@ -289,6 +290,13 @@ class SliceCreationEnv3(gym.Env):
     def deallocate_slice(self, request, slice_id):
         # Function to deallocate resources of killed requests
 
+        indices = np.where(self.PRB_map == request['UE_ID'])
+
+        for i in range(len(indices[0])):
+            #print(f"({indices[0][i]}, {indices[1][i]})")
+            self.PRB_map[indices[0][i], indices[1][i]] = 0
+
+
         if slice_id == 1:
             self.resources_1['MEC_CPU'] += request['SLICE_MEC_CPU_REQUEST']
             self.resources_1['MEC_RAM'] += request['SLICE_MEC_RAM_REQUEST']
@@ -313,11 +321,20 @@ class SliceCreationEnv3(gym.Env):
         slice2 = self.slices_param[2]
         slice3 = self.slices_param[3]
         
-        if request['SLICE_MEC_CPU_REQUEST'] <= slice1[0] and request['SLICE_MEC_RAM_REQUEST'] <= slice1[1] and request['SLICE_MEC_STORAGE_REQUEST'] <= slice1[2] and request['SLICE_MEC_BW_REQUEST'] <= slice1[3]:
+        if (request['SLICE_MEC_CPU_REQUEST'] <= slice1[0] and request['SLICE_MEC_RAM_REQUEST'] <= slice1[1] and 
+            request['SLICE_MEC_STORAGE_REQUEST'] <= slice1[2] and request['SLICE_MEC_BW_REQUEST'] <= slice1[3] and
+            request['SLICE_RAN_R'] <= slice1[4]
+            ):
             slice_id = 1
-        elif request['SLICE_MEC_CPU_REQUEST'] <= slice2[0] and request['SLICE_MEC_RAM_REQUEST'] <= slice2[1] and request['SLICE_MEC_STORAGE_REQUEST'] <= slice2[2] and request['SLICE_MEC_BW_REQUEST'] <= slice2[3]:
+        elif (request['SLICE_MEC_CPU_REQUEST'] <= slice2[0] and request['SLICE_MEC_RAM_REQUEST'] <= slice2[1] and 
+              request['SLICE_MEC_STORAGE_REQUEST'] <= slice2[2] and request['SLICE_MEC_BW_REQUEST'] <= slice2[3] and 
+              request['SLICE_RAN_R'] <= slice2[4]
+              ):
             slice_id = 2
-        elif request['SLICE_MEC_CPU_REQUEST'] <= slice3[0] and request['SLICE_MEC_RAM_REQUEST'] <= slice3[1] and request['SLICE_MEC_STORAGE_REQUEST'] <= slice3[2] and request['SLICE_MEC_BW_REQUEST'] <= slice3[3]:
+        elif (request['SLICE_MEC_CPU_REQUEST'] <= slice3[0] and request['SLICE_MEC_RAM_REQUEST'] <= slice3[1] and 
+              request['SLICE_MEC_STORAGE_REQUEST'] <= slice3[2] and request['SLICE_MEC_BW_REQUEST'] <= slice3[3] and
+              request['SLICE_RAN_R'] <= slice3[4]
+              ):
             slice_id = 3
         return slice_id
 

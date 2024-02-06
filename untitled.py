@@ -1,7 +1,9 @@
 import numpy as np
 
-#matrix = np.array([[1, 2, 3],[4, 5, 6],[7, 5, 0]])
-matrix = np.zeros((3,4))
+matrix = np.array([[1, 0, 3],
+                   [4, 5, 6],
+                   [7, 9, 0]])
+#matrix = np.zeros((3,4))
 
 # Value to find
 value_to_find = 0
@@ -9,7 +11,13 @@ value_to_find = 0
 # Find indices where value equals value_to_find
 indices = np.where(matrix == value_to_find)
 
-print(50_000_000)
+print(matrix[1,0])
+
+matrix[1,0] = 10
+
+print(matrix)
+
+print(indices[0], indices[1])
 
 if len(indices[0]) > 0:
     # Print the indices of the value
