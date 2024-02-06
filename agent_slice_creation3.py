@@ -13,7 +13,7 @@ from gymnasium.wrappers import TimeLimit
 env = SliceCreationEnv3()
 env = TimeLimit(env, max_episode_steps=99)
 
-log_path = "/home/mario/Documents/DQN_Models/Model 1/gym-examples2/logs"
+log_path = "/home/mario/Documents/DQN_Models/Model 1/gym-examples3/logs"
 #log_path = "/data/scripts/DQN_models/Model 1/logs/"     #For pod
 new_logger = configure(log_path, ["stdout", "csv", "tensorboard"])
 
@@ -38,4 +38,4 @@ model = DQN("MlpPolicy",env,
 #model = DQN("MlpPolicy", env, verbose=1, exploration_final_eps=0, exploration_fraction=0.5)
 model.set_logger(new_logger)
 model.learn(total_timesteps=1500000, log_interval=1000)
-model.save("/home/mario/Documents/DQN_Models/Model 1/gym-examples2/dqn_slices1")
+model.save("/home/mario/Documents/DQN_Models/Model 1/gym-examples3/dqn_slices1")
