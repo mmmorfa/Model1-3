@@ -21,8 +21,8 @@ def read_csv(file_path):
     
     return columns
 
-file_path1 = '/home/mario/Documents/DQN_Models/Model 1/gym-examples2/logs/progress_dqn_slices2(Arch:16; learn:1e-3; starts:250k; fraction:0_5; train: 1.5M).csv'
-#file_path = '/data/scripts/DQN_models/Model 1/logs/progress.csv'
+#file_path1 = '/home/mario/Documents/DQN_Models/Model 1/gym-examples2/logs/progress_dqn_slices2(Arch:16; learn:1e-3; starts:250k; fraction:0_5; train: 1.5M).csv'
+file_path1 = '/home/mario/Documents/DQN_Models/Model 1/gym-examples3/logs/progress.csv'
 
 #file_path2 = '/home/mario/Documents/DQN_Models/Model 1/gym-examples/logs/progress(1e-3).csv'
 #file_path3 = '/home/mario/Documents/DQN_Models/Model 1/gym-examples/logs/progress(1e-5).csv'

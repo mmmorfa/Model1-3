@@ -26,7 +26,7 @@ ARRIVAL_RATE = {0: 3, 1: 2, 2: 3, 3: 4, 4: 2, 5: 3}
 # VNF life cycle from VNF types dictionary
 LIFE_CYCLE_RATE = {0: 10, 1: 8, 2: 5, 3: 3, 4: 9, 5: 10}
 # Num of vnf requests
-NUM_VNF_REQUESTS = 100
+NUM_VNF_REQUESTS = 10000
 
 # ****************************** VNF Generator FUNCTIONS ******************************
 
@@ -116,10 +116,10 @@ class SliceCreationEnv3(gym.Env):
 
         # RAN Global Parameters -------------------------------------------------------------------------------------------------------------------------------------------------------------
         self.numerology = 1                       # 0,1,2,3,...
-        self.scs = 2^(self.numerology) * 15_000   # Hz
-        self.slot_per_subframe = 2^(self.numerology)
+        self.scs = 2**(self.numerology) * 15_000   # Hz
+        self.slot_per_subframe = 2**(self.numerology)
         
-        self.channel_BW = 10_000_000              # Hz (100MHz for <6GHz band, and 400MHZ for mmWave)
+        self.channel_BW = 100_000_000              # Hz (100MHz for <6GHz band, and 400MHZ for mmWave)
         self.guard_BW = 845_000                   # Hz (for symmetric guard band)
 
         self.PRB_BW = self.scs * 12               # Hz - Bandwidth for one PRB (one OFDM symbol, 12 subcarriers)
@@ -185,7 +185,7 @@ class SliceCreationEnv3(gym.Env):
         self.info = {}
         self.first = True
         
-        #print("\nReset: ", self.observation)
+        print("\nReset: ", self.observation)
         
         return self.observation, self.info
 
@@ -446,14 +446,14 @@ class SliceCreationEnv3(gym.Env):
 
         W_total = self.PRB_BW * self.sprectral_efficiency * available_symbols
 
-        if request['SLICE_RAN_R_REQUEST'] * (10^6) <= W_total * log2(1 + request['UE_SiNR']):
+        if request['SLICE_RAN_R_REQUEST'] * (10**6) <= W_total * log2(1 + request['UE_SiNR']):
             return True
         else: return False
 
     def allocate_ran(self, request):
         indices = np.where(self.PRB_map == 0)
 
-        number_symbols = ceil((request['SLICE_RAN_R_REQUEST'] * (10^6)) / (self.PRB_BW * self.sprectral_efficiency * log2(1 + request['UE_SiNR'])))
+        number_symbols = ceil((request['SLICE_RAN_R_REQUEST'] * (10**6)) / (self.PRB_BW * self.sprectral_efficiency * log2(1 + request['UE_SiNR'])))
 
         for i in range(number_symbols):
             #print(f"({indices[0][i]}, {indices[1][i]})")
@@ -468,5 +468,5 @@ class SliceCreationEnv3(gym.Env):
             pygame.display.quit()
             pygame.quit()
             
-a = SliceCreationEnv3()
-check_env(a)
+#a = SliceCreationEnv3()
+#check_env(a)

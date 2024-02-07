@@ -37,5 +37,5 @@ model = DQN("MlpPolicy",env,
 #model = DQN.load("dqn_slices1", env)
 #model = DQN("MlpPolicy", env, verbose=1, exploration_final_eps=0, exploration_fraction=0.5)
 model.set_logger(new_logger)
-model.learn(total_timesteps=1500000, log_interval=1000)
+model.learn(total_timesteps=1500000, log_interval=100)
 model.save("/home/mario/Documents/DQN_Models/Model 1/gym-examples3/dqn_slices1")

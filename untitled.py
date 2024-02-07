@@ -1,3 +1,4 @@
+'''
 import numpy as np
 
 matrix = np.array([[1, 0, 3],
@@ -26,3 +27,7 @@ if len(indices[0]) > 0:
         print(f"({indices[0][i]}, {indices[1][i]})")
 else:
     print(f"The value {value_to_find} is not found in the matrix.")
+    '''
+
+a = 2**(1) * 15_000
+print(a)
